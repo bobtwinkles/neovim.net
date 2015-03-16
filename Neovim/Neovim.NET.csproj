@@ -29,11 +29,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="MsgPack">
-      <HintPath>..\packages\MsgPack.Cli.0.5.11\lib\net45\MsgPack.dll</HintPath>
-    </Reference>
     <Reference Include="YamlDotNet">
       <HintPath>..\packages\YamlDotNet.3.5.1\lib\net35\YamlDotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="MsgPack">
+      <HintPath>..\libs\MsgPack.dll</HintPath>
+    </Reference>
+    <Reference Include="MsgPack.Rpc">
+      <HintPath>..\libs\MsgPack.Rpc.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
