@@ -1,0 +1,121 @@
+﻿<#@ template hostspecific="true" language="C#"#>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="$(SolutionDir)/packages/YamlDotNet.3.5.1/lib/net35/YamlDotNet.dll" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="YamlDotNet.RepresentationModel" #>
+<#
+var path = Host.ResolvePath("api.yaml");
+var istream = new FileStream(path, FileMode.Open);
+try { // closed at the end of the file, used to ensure that the T4 engine always cleans up the open file handle
+	var ireader = new StreamReader(istream);
+	var yaml = new YamlStream();
+	yaml.Load(ireader);
+	var root = (YamlMappingNode)yaml.Documents[0].RootNode;
+
+	var error_types = (YamlMappingNode)(root.Children[new YamlScalarNode("error_types")]);
+	var types       = (YamlMappingNode)root.Children[new YamlScalarNode("types")];
+	var functions   = (YamlSequenceNode)root.Children[new YamlScalarNode("functions")];
+#>
+// Generated from <#=  path #>
+using System;
+using Neovim.MsgPackRPC.Types;
+
+namespace Neovim.MsgPackRPC
+{
+	namespace Types
+	{
+		namespace Errors {
+<#
+	foreach (var type in error_types) {
+		var typename = "Neovim" + type.Key + "Error";
+		var val = (YamlMappingNode)(type.Value);
+		var id = ((YamlScalarNode)(val.Children[new YamlScalarNode("id")])).Value;
+#>
+			public class <#=typename#> : Exception
+			{
+				public const int ID = <#=id#>;
+				public <#=typename#>(string message) : base(message)
+				{
+				}
+			}
+<#	} #>
+		}
+<#
+	foreach (var type in types) {
+		var typename = type.Key;
+		var val = (YamlMappingNode)(type.Value);
+		var id = ((YamlScalarNode)(val.Children[new YamlScalarNode("id")])).Value;
+#>
+		public partial class <#=typename#>
+		{
+			public const int ID = <#=id#>;
+		}
+<#	} #>
+	}
+
+	public static class RPCAPI {
+<#
+	foreach (var function in functions) {
+		var spec = ((YamlMappingNode)(function)).Children;
+		var returnType = ToCSType(((YamlScalarNode)(spec[new YamlScalarNode("return_type")])).Value);
+
+		var funcName = ((YamlScalarNode)(spec[new YamlScalarNode("name")])).Value;
+		var argTypes = (YamlSequenceNode)(spec[new YamlScalarNode("parameters")]);
+		List<string> argStrings = new List<string>();
+		List<string> paramStrings = new List<string>();
+		foreach (var arg in argTypes) {
+			var argNode = (YamlSequenceNode)arg;
+			var argType = ToCSType(((YamlScalarNode)(argNode.Children[0])).Value);
+			var argName = ToCSName(((YamlScalarNode)(argNode.Children[1])).Value, false);
+			argStrings.Add(argType + " " + argName);
+			paramStrings.Add(argName);
+		}
+		var argString = string.Join(", ", argStrings.ToArray());
+		var paramString = string.Join(", ", paramStrings.ToArray());
+#>
+		static <#=returnType#> <#=ToCSName(funcName, true)#> (<#=argString#>)
+		{
+<# 		if (returnType == "void") {#>
+			RPCUtils.Call("<#=funcName#>", <#=paramString #>);
+<#		} else { #>
+			return RPCUtils.Call("<#=funcName#>", <#=paramString#>);
+<#		} #>
+		}
+
+<#	}#>
+	}
+}<#
+	} catch (Exception ex) {
+		this.Write("Generation Failed: ");
+		this.Write(ex.ToString());
+	} finally {
+		istream.Close();
+	}
+#>
+<#+
+public string ToCSType(string returnType) {
+	if (returnType == "Integer") {
+		return "int";
+	}
+	if (returnType.StartsWith("ArrayOf")) {
+		var realType = returnType.Split('(')[1];
+		if (returnType.IndexOf(',') != -1) {
+			realType = realType.Split(',')[0];
+		} else {
+			realType = realType.Substring(0, realType.Length - 1);
+		}
+		if (realType == "Integer") { realType = "int"; }
+		returnType = realType + "[]";
+	}
+	return returnType;
+}
+
+public string ToCSName(string name, bool uppercaseFirst) {
+	string[] s = name.Split('_');
+	for (int i = uppercaseFirst ? 0 : 1; i < s.Length; ++i) {
+		s[i] = char.ToUpper(s[i][0]) + s[i].Substring(1);
+	}
+	return string.Join("", s);
+}
+#>

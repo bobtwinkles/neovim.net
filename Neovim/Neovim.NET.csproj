@@ -29,10 +29,34 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="MsgPack">
+      <HintPath>..\packages\MsgPack.Cli.0.5.11\lib\net45\MsgPack.dll</HintPath>
+    </Reference>
+    <Reference Include="YamlDotNet">
+      <HintPath>..\packages\YamlDotNet.3.5.1\lib\net35\YamlDotNet.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Neovim.cs" />
+    <Compile Include="Neovim\MsgPackRPC\ISession.cs" />
+    <Compile Include="Neovim\MsgPackRPC\Sessions\SocketSession.cs" />
+    <Compile Include="Neovim\MsgPackRPC\Types\RemoteMap.cs" />
+    <Compile Include="Neovim\MsgPackRPC\RPCAPI.cs">
+      <DependentUpon>RPCAPI.tt</DependentUpon>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <Folder Include="Neovim\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="Neovim\MsgPackRPC\RPCAPI.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>RPCAPI.cs</LastGenOutput>
+    </None>
+    <None Include="Neovim\MsgPackRPC\api.yaml" />
+    <None Include="Neovim\MsgPackRPC\.gitignore" />
+  </ItemGroup>
 </Project>

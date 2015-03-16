@@ -1,12 +1,10 @@
 ﻿using System;
+using MsgPack;
 
 namespace Neovim
 {
-	public class MyClass
+	public class Neovim
 	{
-		public MyClass ()
-		{
-		}
 	}
 }
 
