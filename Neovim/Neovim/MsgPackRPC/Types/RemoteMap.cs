@@ -27,6 +27,7 @@ namespace Neovim.MsgPackRPC.Types
 
 		public string this [string key] {
 			get {
+				return "TODO";
 			}
 			set {
 				if (this._setMethod == null) {

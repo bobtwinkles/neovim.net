@@ -18,8 +18,10 @@ try { // closed at the end of the file, used to ensure that the T4 engine always
 	var functions   = (YamlSequenceNode)root.Children[new YamlScalarNode("functions")];
 #>
 // Generated from <#=  path #>
-using System;
+using MsgPack.Rpc.Client;
 using Neovim.MsgPackRPC.Types;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Neovim.MsgPackRPC
 {
@@ -32,7 +34,7 @@ namespace Neovim.MsgPackRPC
 		var val = (YamlMappingNode)(type.Value);
 		var id = ((YamlScalarNode)(val.Children[new YamlScalarNode("id")])).Value;
 #>
-			public class <#=typename#> : Exception
+			public class <#=typename#> : System.Exception
 			{
 				public const int ID = <#=id#>;
 				public <#=typename#>(string message) : base(message)
@@ -47,6 +49,7 @@ namespace Neovim.MsgPackRPC
 		var val = (YamlMappingNode)(type.Value);
 		var id = ((YamlScalarNode)(val.Children[new YamlScalarNode("id")])).Value;
 #>
+
 		public partial class <#=typename#>
 		{
 			public const int ID = <#=id#>;
@@ -55,6 +58,8 @@ namespace Neovim.MsgPackRPC
 	}
 
 	public static class RPCAPI {
+		// All of these functions use __client instead of the more typical 'client' in order to prevent any possible
+		// naming conflicts with future versions of nvim
 <#
 	foreach (var function in functions) {
 		var spec = ((YamlMappingNode)(function)).Children;
@@ -62,24 +67,45 @@ namespace Neovim.MsgPackRPC
 
 		var funcName = ((YamlScalarNode)(spec[new YamlScalarNode("name")])).Value;
 		var argTypes = (YamlSequenceNode)(spec[new YamlScalarNode("parameters")]);
+		var deferred = bool.Parse(((YamlScalarNode)(spec[new YamlScalarNode("deferred")])).Value);
 		List<string> argStrings = new List<string>();
+		argStrings.Add("RpcClient __client"); // we always need at least this parameter
 		List<string> paramStrings = new List<string>();
 		foreach (var arg in argTypes) {
 			var argNode = (YamlSequenceNode)arg;
 			var argType = ToCSType(((YamlScalarNode)(argNode.Children[0])).Value);
 			var argName = ToCSName(((YamlScalarNode)(argNode.Children[1])).Value, false);
-			argStrings.Add(argType + " " + argName);
-			paramStrings.Add(argName);
+			argStrings.Add(argType + " _" + argName);
+			paramStrings.Add("_" + argName);
 		}
-		var argString = string.Join(", ", argStrings.ToArray());
-		var paramString = string.Join(", ", paramStrings.ToArray());
+		var callMethod = "Call";
+		string argString = string.Join(", ", argStrings.ToArray());
+		string paramString;
+		if (deferred) {
+			if (returnType != "void") {
+				returnType = "Task<" + returnType + ">";
+			} else {
+				returnType = "Task";
+			}
+			callMethod = "CallAsync";
+			// TODO: allow users to pass context
+			paramString = "\"" + funcName.ToString() + "\", parameters, null";
+		} else {
+			paramStrings.Insert(0, "\"" + funcName.ToString() + "\""); // we always need at least the function name
+			paramString = string.Join(", ", paramStrings.ToArray());
+		}
 #>
-		static <#=returnType#> <#=ToCSName(funcName, true)#> (<#=argString#>)
+		static <#=returnType#> <#=ToCSName(funcName, true)#>(<#=argString#>)
 		{
-<# 		if (returnType == "void") {#>
-			RPCUtils.Call("<#=funcName#>", <#=paramString #>);
+<#		if (deferred) { #>
+			object[] parameters = { <#=string.Join(", ", paramStrings.ToArray())#> };
+<#		} #>
+<# 		if (returnType == "void") { #>
+			__client.<#=callMethod#>(<#=paramString #>);
 <#		} else { #>
-			return RPCUtils.Call("<#=funcName#>", <#=paramString#>);
+			<#=returnType#> ret;
+			RPCUtils.Parse(__client.<#=callMethod#>(<#=paramString#>), out ret);
+			return ret;
 <#		} #>
 		}
 
@@ -94,10 +120,27 @@ namespace Neovim.MsgPackRPC
 	}
 #>
 <#+
-public string ToCSType(string returnType) {
-	if (returnType == "Integer") {
-		return "int";
+
+private static readonly Dictionary<string, string> Corrections = new Dictionary<string, string>
+	{
+		{"Integer"		, "int"},
+		{"Object"		, "string"}, // in Msgpack, objects and strings are the same thing
+		{"String"		, "string"},
+		{"Boolean"		, "bool"},
+		{"Array"		, "string[]"},
+		{"Dictionary"	, "Dictionary<string, string>"},
+	};
+
+
+public string CorrectType(string type) {
+	if (Corrections.ContainsKey(type)) {
+		return Corrections[type];
+	} else {
+		return type;
 	}
+}
+
+public string ToCSType(string returnType) {
 	if (returnType.StartsWith("ArrayOf")) {
 		var realType = returnType.Split('(')[1];
 		if (returnType.IndexOf(',') != -1) {
@@ -105,9 +148,10 @@ public string ToCSType(string returnType) {
 		} else {
 			realType = realType.Substring(0, realType.Length - 1);
 		}
-		if (realType == "Integer") { realType = "int"; }
+		realType = CorrectType(realType);
 		returnType = realType + "[]";
 	}
+	returnType = CorrectType(returnType);
 	return returnType;
 }
 
