@@ -1,16 +1,10 @@
-﻿using System;
+﻿// vim: noexpandtab ts=4 sts=4 sw=4 colorcolumn=120
+using System;
 using System.Collections.Generic;
 using System.IO;
 
 namespace Neovim.Msgpack
 {
-	public class MalformedMsgpackException : Exception
-	{
-		public MalformedMsgpackException (string s) : base (s)
-		{
-		}
-	}
-
 	public enum MsgpackType : byte
 	{
 		POSFIXINT = 0x00,
@@ -61,28 +55,21 @@ namespace Neovim.Msgpack
 		NEGFIXINT = 0xE0
 	}
 
-	public class Transcoder : IDisposable
+	public class MsgpackWriter : IDisposable
 	{
 		private readonly Stream _transport;
 		private BigEndianBinaryWriter _writer;
-		private BigEndianBinaryReader _reader;
-		private byte _peek;
-		private bool _did_peek;
 
-		public Transcoder (Stream transport)
+		public MsgpackWriter (Stream transport)
 		{
 			this._transport = transport;
 			this._writer = new BigEndianBinaryWriter (_transport);
-			this._reader = new BigEndianBinaryReader (_transport);
-			this._peek = 0;
-			this._did_peek = false;
 		}
 
 		public void Dispose ()
 		{
 			_transport.Dispose ();
 			_writer = null;
-			_reader = null;
 		}
 
 		#region Writers
@@ -215,7 +202,7 @@ namespace Neovim.Msgpack
 			_transport.Write (bytes, 0, bytes.Length);
 		}
 
-		public void WriteArray (IMarshalable[] obj)
+		public void WriteArray (PackedList obj)
 		{
 			if (obj.Length < 16) {
 				_writer.Write ((byte)(0x90 | obj.Length));
@@ -226,12 +213,12 @@ namespace Neovim.Msgpack
 				_writer.Write ((byte)0xDD);
 				_writer.Write ((UInt32)obj.Length);
 			}
-			foreach (var i in obj) {
+			foreach (var i in obj.Values) {
 				i.WriteTo (this);
 			}
 		}
 
-		public void WriteDictionary (Dictionary<IMarshalable, IMarshalable> dict)
+		public void WriteDictionary (PackedMap dict)
 		{
 			if (dict.Count < 16) {
 				_writer.Write ((byte)(0x80 | dict.Count));
@@ -248,33 +235,54 @@ namespace Neovim.Msgpack
 			}
 		}
 
-		public void WriteObject (sbyte type, byte[] data)
+		public void WriteObjectlength (sbyte type, int length)
 		{
-			if (data.Length == 1) {
+			if (length == 1) {
 				_writer.Write ((byte)0xD4);
-			} else if (data.Length == 2) {
+			} else if (length == 2) {
 				_writer.Write ((byte)0xD5);
-			} else if (data.Length == 4) {
+			} else if (length == 4) {
 				_writer.Write ((byte)0xD6);
-			} else if (data.Length == 8) {
+			} else if (length == 8) {
 				_writer.Write ((byte)0xD7);
-			} else if (data.Length == 16) {
+			} else if (length == 16) {
 				_writer.Write ((byte)0xD8);
-			} else if (data.Length < 256) {
+			} else if (length < 256) {
 				_writer.Write ((byte)0xC7);
-				_writer.Write ((byte)data.Length);
-			} else if (data.Length < 0x1000) {
+				_writer.Write ((byte)length);
+			} else if (length < 0x1000) {
 				_writer.Write ((byte)0xC8);
-				_writer.Write ((UInt16)data.Length);
+				_writer.Write ((UInt16)length);
 			} else {
 				_writer.Write ((byte)0xC9);
-				_writer.Write ((UInt32)data.Length);
+				_writer.Write ((UInt32)length);
 			}
 			_writer.Write (type);
-			_transport.Write (data, 0, data.Length);
 		}
 
 		#endregion
+	}
+
+	public class MsgpackReader : IDisposable
+	{
+		private readonly Stream _transport;
+		private BigEndianBinaryReader _reader;
+		private byte _peek;
+		private bool _did_peek;
+
+		public MsgpackReader (Stream transport)
+		{
+			this._transport = transport;
+			this._reader = new BigEndianBinaryReader (_transport);
+			this._peek = 0;
+			this._did_peek = false;
+		}
+
+		public void Dispose ()
+		{
+			_transport.Dispose ();
+			_reader = null;
+		}
 
 		#region reader utilities
 
@@ -286,7 +294,7 @@ namespace Neovim.Msgpack
 			}
 			int r = _transport.ReadByte ();
 			if (r < 0) {
-				throw new MalformedMsgpackException ("Unexpected end of stream");
+				throw new InvalidDataException ("Unexpected end of stream");
 			}
 			return (byte)r;
 		}
@@ -303,7 +311,7 @@ namespace Neovim.Msgpack
 		{
 			int b = ReadTransport ();
 			if (b != type) {
-				throw new MalformedMsgpackException (String.Format ("Unexpected type code {0:X}, expected {1:X}", b, type));
+				throw new InvalidDataException (String.Format ("Unexpected type code {0:X}, expected {1:X}", b, type));
 			}
 		}
 
@@ -315,10 +323,10 @@ namespace Neovim.Msgpack
 		{
 			int b = ReadTransport ();
 			if ((b & 0x80) != 0) {
-				throw new MalformedMsgpackException ("MSB of positive fixint was set");
+				throw new InvalidDataException ("MSB of positive fixint was set");
 			}
 			if (b >= 128 || b < 0) {
-				throw new MalformedMsgpackException (String.Format ("Positive fixint was {0}, out of range [0-127]", b));
+				throw new InvalidDataException (String.Format ("Positive fixint was {0}, out of range [0-127]", b));
 			}
 			return (byte)b;
 		}
@@ -327,21 +335,21 @@ namespace Neovim.Msgpack
 		{
 			int b = ReadTransport ();
 			if ((b & 0xe0) != 0xe0) {
-				throw new MalformedMsgpackException ("Three MSB of negative fixint were not set");
+				throw new InvalidDataException ("Three MSB of negative fixint were not set");
 			}
 			return (sbyte)b;
 		}
 
-		public bool ReadBool()
+		public bool ReadBool ()
 		{
-			int b = ReadTransport();
+			int b = ReadTransport ();
 			if (b == 0xC3) {
 				return true;
 			}
 			if (b == 0xC2) {
 				return false;
 			}
-			throw new MalformedMsgpackException(String.Format("Expected boolean, but got {0:X}", b));
+			throw new InvalidDataException (String.Format ("Expected boolean, but got {0:X}", b));
 		}
 
 		public byte ReadByte ()
@@ -417,7 +425,7 @@ namespace Neovim.Msgpack
 			} else if (b == 0xDB) { // UInt32 length string
 				strlen = _reader.ReadUInt32 ();
 			} else {
-				throw new MalformedMsgpackException (String.Format ("Expected a string header but got {0:X}", b));
+				throw new InvalidDataException (String.Format ("Expected a string header but got {0:X}", b));
 			}
 			var data = new byte[strlen];
 			_transport.Read (data, 0, (int)strlen);
@@ -439,11 +447,67 @@ namespace Neovim.Msgpack
 				len = ReadUInt32 ();
 				break;
 			default:
-				throw new MalformedMsgpackException (String.Format ("Expected a bytes header but got {0:X}", b));
+				throw new InvalidDataException (String.Format ("Expected a bytes header but got {0:X}", b));
 			}
 			var tr = new byte[len];
 			_transport.Read (tr, 0, (int)len);
 			return tr;
+		}
+
+		/// This logic needs to be in here since msgpack encodes the length in the type sometimes
+		public void ReadArray(PackedList o) {
+			uint length;
+			byte b = ReadTransport();
+			if ((b & 0x90) == 0x90) {
+				length = (uint)(b & (~0x90));
+			} else if (b == 0xDC) {
+				length = _reader.ReadUInt16();
+			} else if (b == (0xDD)) {
+				length = _reader.ReadUInt32();
+			} else {
+				throw new InvalidDataException(String.Format ("Expected a list header, but got {0:X}", b));
+			}
+			o.Values = new EncapsulatedValue[length];
+			for (var i = 0; i < length; ++i) {
+				o.Values[i] = ReadEncapsulated();
+			}
+		}
+
+		/// This logic needs to be in here since msgpack encodes the length in the type sometimes
+		public void ReadDictionary(PackedMap dic) {
+			uint length;
+			byte b = ReadTransport();
+			if ((b & 0x80) == 0x80) {
+				length = (uint)(b & (~0x80));
+			} else if (b == 0xDE) {
+				length = _reader.ReadUInt16();
+			} else if (b == 0xDF) {
+				length = _reader.ReadUInt32();
+			} else {
+				throw new InvalidDataException(String.Format ("Expected a map header, but got {0:X}", b));
+			}
+			for (var i = 0; i < length; ++i) {
+				EncapsulatedValue key = ReadEncapsulated();
+				dic[key] = ReadEncapsulated();
+			}
+		}
+
+		public void ReadObjectHead(out sbyte type, out uint length)
+		{
+			byte b = ReadTransport();
+			switch(b) {
+				case 0xD4: length = 1; break;
+				case 0xD5: length = 2; break;
+				case 0xD6: length = 4; break;
+				case 0xD7: length = 8; break;
+				case 0xD8: length = 16; break;
+				case 0xC7: length = _reader.ReadByte(); break;
+				case 0xC8: length = _reader.ReadUInt16(); break;
+				case 0xC9: length = _reader.ReadUInt32(); break;
+				default:
+						   throw new InvalidDataException(String.Format ("Expected object header, but got {0:X}", b));
+			}
+			type = _reader.ReadInt8();
 		}
 
 		public MsgpackType PeekType ()
@@ -465,72 +529,14 @@ namespace Neovim.Msgpack
 				return MsgpackType.NEGFIXINT;
 			}
 			if (b == 0xC1) { //guaranteed unused by the spec
-				throw new MalformedMsgpackException ("Got a 0xC1 byte when reading type");
+				throw new InvalidDataException ("Got a 0xC1 byte when reading type");
 			}
 			return (MsgpackType)b;
 		}
 
 		public EncapsulatedValue ReadEncapsulated ()
 		{
-			MsgpackType type = PeekType();
-			switch (type) {
-			case MsgpackType.POSFIXINT:
-				return new EncapsulatedValue (type, ReadPosFixInt ());
-			case MsgpackType.MAP32:
-			case MsgpackType.MAP16:
-			case MsgpackType.FIXMAP:
-				throw new Exception ("Not implemented");
-			case MsgpackType.ARRAY32:
-			case MsgpackType.ARRAY16:
-			case MsgpackType.FIXARRAY:
-				throw new Exception ("Not implemented");
-			case MsgpackType.STRING32:
-			case MsgpackType.STRING16:
-			case MsgpackType.STRING8:
-			case MsgpackType.FIXSTR:
-				return new EncapsulatedValue(type, ReadString());
-			case MsgpackType.NIL:
-				return new EncapsulatedValue(type, null);
-			case MsgpackType.FALSE:
-			case MsgpackType.TRUE:
-				return new EncapsulatedValue(type, ReadBool());
-			case MsgpackType.BIN32:
-			case MsgpackType.BIN16:
-			case MsgpackType.BIN8:
-				return new EncapsulatedValue(type, ReadBytes());
-			case MsgpackType.EXT32:
-			case MsgpackType.EXT16:
-			case MsgpackType.EXT8:
-			case MsgpackType.FIXEXT16:
-			case MsgpackType.FIXEXT8:
-			case MsgpackType.FIXEXT4:
-			case MsgpackType.FIXEXT2:
-			case MsgpackType.FIXEXT1:
-				throw new Exception ("Not implemented");
-			case MsgpackType.SINGLE:
-				return new EncapsulatedValue(type, ReadSingle());
-			case MsgpackType.DOUBLE:
-				return new EncapsulatedValue(type, ReadDouble());
-			case MsgpackType.BYTE:
-				return new EncapsulatedValue(type, ReadByte());
-			case MsgpackType.UINT16:
-				return new EncapsulatedValue(type, ReadUInt16());
-			case MsgpackType.UINT32:
-				return new EncapsulatedValue(type, ReadUInt32());
-			case MsgpackType.UINT64:
-				return new EncapsulatedValue(type, ReadUInt64());
-			case MsgpackType.INT8:
-				return new EncapsulatedValue(type, ReadInt8());
-			case MsgpackType.INT16:
-				return new EncapsulatedValue(type, ReadInt16());
-			case MsgpackType.INT32:
-				return new EncapsulatedValue(type, ReadInt32());
-			case MsgpackType.INT64:
-				return new EncapsulatedValue(type, ReadInt64());
-			case MsgpackType.NEGFIXINT:
-				return new EncapsulatedValue(type, ReadNegFixInt());
-			}
-			throw new MalformedMsgpackException("Unable to determine an appropriate type");
+			return new EncapsulatedValue(this);
 		}
 
 		#endregion

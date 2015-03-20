@@ -1,4 +1,5 @@
-﻿using System;
+﻿// vim: noexpandtab ts=4 sts=4 sw=4 colorcolumn=120
+using System;
 using System.IO;
 
 namespace Neovim.Msgpack
@@ -67,6 +68,12 @@ namespace Neovim.Msgpack
 		{
 			ReadBytes (1);
 			return _buffer [0];
+		}
+
+		public sbyte ReadInt8 ()
+		{
+			ReadBytes (1);
+			return ((sbyte)_buffer [0]);
 		}
 
 		#endregion
