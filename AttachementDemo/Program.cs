@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Net.Sockets;
-using Neovim.UnixTransport;
 using Mono.Unix;
-using MsgPack.Rpc;
-using MsgPack.Rpc.Client;
+using Neovim.Msgpack;
 
 namespace AttachementDemo
 {
@@ -11,18 +9,18 @@ namespace AttachementDemo
 	{
 		public static void Main (string[] args)
 		{
+			for (int i = 0; i < 256; ++i) {
+				Console.WriteLine ("{0} {1}", i, (MsgpackType)i);
+			}
 			Console.WriteLine ("To get the address of a running nvim process, run '!echo $NVIM_LISTEN_ADDRESS'");
 			Console.Write ("Please enter that here: ");
-			string endpoint = Console.ReadLine ();
-			RpcClientConfiguration conf = new RpcClientConfiguration ();
-			conf.TransportManagerProvider = (RpcClientConfiguration cfg) => new UnixTransportManager (cfg);
-			RpcClient c = new RpcClient (new UnixEndPoint (endpoint), conf);
+			//string endpoint = Console.ReadLine ();
 
-			var o = c.Call ("vim_get_api_info");
+//			var o = c.Call ("vim_get_api_info");
+//
+//			Console.Write (o);
 
-			Console.Write (o);
-
-			c.Shutdown ();
+//			c.Shutdown ();
 		}
 	}
 }

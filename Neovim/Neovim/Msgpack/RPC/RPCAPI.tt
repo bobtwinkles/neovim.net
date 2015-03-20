@@ -18,12 +18,11 @@ try { // closed at the end of the file, used to ensure that the T4 engine always
 	var functions   = (YamlSequenceNode)root.Children[new YamlScalarNode("functions")];
 #>
 // Generated from <#=  path #>
-using MsgPack.Rpc.Client;
-using Neovim.MsgPackRPC.Types;
+using Neovim.Msgpack.RPC.Types;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Neovim.MsgPackRPC
+namespace Neovim.Msgpack.RPC
 {
 	namespace Types
 	{
@@ -69,7 +68,7 @@ namespace Neovim.MsgPackRPC
 		var argTypes = (YamlSequenceNode)(spec[new YamlScalarNode("parameters")]);
 		var deferred = bool.Parse(((YamlScalarNode)(spec[new YamlScalarNode("deferred")])).Value);
 		List<string> argStrings = new List<string>();
-		argStrings.Add("RpcClient __client"); // we always need at least this parameter
+		argStrings.Add("RPCClient __client"); // we always need at least this parameter
 		List<string> paramStrings = new List<string>();
 		foreach (var arg in argTypes) {
 			var argNode = (YamlSequenceNode)arg;
@@ -95,6 +94,7 @@ namespace Neovim.MsgPackRPC
 			paramString = string.Join(", ", paramStrings.ToArray());
 		}
 #>
+		/*
 		static <#=returnType#> <#=ToCSName(funcName, true)#>(<#=argString#>)
 		{
 <#		if (deferred) { #>
@@ -108,6 +108,7 @@ namespace Neovim.MsgPackRPC
 			return ret;
 <#		} #>
 		}
+		*/
 
 <#	}#>
 	}

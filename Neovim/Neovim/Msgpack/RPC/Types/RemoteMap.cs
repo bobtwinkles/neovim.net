@@ -1,7 +1,7 @@
 ﻿using System;
 using YamlDotNet.Core;
 
-namespace Neovim.MsgPackRPC.Types
+namespace Neovim.Msgpack.RPC.Types
 {
 	/// <summary>
 	//// Represents a remote vimscript map.

@@ -45,15 +45,4 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="MsgPack">
-      <HintPath>..\libs\MsgPack.dll</HintPath>
-    </Reference>
-    <Reference Include="MsgPack.Rpc.Client">
-      <HintPath>..\libs\MsgPack.Rpc.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="MsgPack.Rpc">
-      <HintPath>..\libs\MsgPack.Rpc.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 </Project>
