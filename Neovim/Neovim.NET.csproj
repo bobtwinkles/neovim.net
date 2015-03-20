@@ -36,7 +36,6 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Neovim.cs" />
-    <Compile Include="Neovim\Msgpack\Marshling\Marshalable.cs" />
     <Compile Include="Neovim\Msgpack\Marshling\BigEndianBinary.cs" />
     <Compile Include="Neovim\Msgpack\Transcoder.cs" />
     <Compile Include="Neovim\Msgpack\Streaming.cs" />
@@ -44,6 +43,7 @@
       <DependentUpon>RPCAPI.tt</DependentUpon>
     </Compile>
     <Compile Include="Neovim\Msgpack\RPC\Types\RemoteMap.cs" />
+    <Compile Include="Neovim\Msgpack\Marshling\IMarshalable.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>

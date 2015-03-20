@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Neovim.Msgpack
 {
-	public interface MsgPackMarshalable
+	public interface IMarshalable
 	{
 		void WriteTo (Transcoder s);
 

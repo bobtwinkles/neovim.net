@@ -109,7 +109,7 @@ namespace Neovim.Msgpack
 			case MsgpackType.FIXEXT4:
 			case MsgpackType.FIXEXT8:
 			case MsgpackType.FIXEXT16:
-				EnsureType (val, typeof(MsgPackMarshalable));
+				EnsureType (val, typeof(IMarshalable));
 				break;
 			case MsgpackType.SINGLE:
 				EnsureType (val, typeof(Single));
@@ -148,18 +148,20 @@ namespace Neovim.Msgpack
 		}
 	}
 
-	public class PackedMap : Dictionary<EncapsulatedValue, EncapsulatedValue>, MsgPackMarshalable
+	public class PackedMap : Dictionary<EncapsulatedValue, EncapsulatedValue>, IMarshalable
 	{
-		public void WriteTo(Transcoder tc) {
+		public void WriteTo (Transcoder tc)
+		{
 			// TODO
 		}
 
-		public void ReadFrom(Transcoder tc) {
+		public void ReadFrom (Transcoder tc)
+		{
 			//TODO
 		}
 	}
 
-	public class PackedList : MsgPackMarshalable
+	public class PackedList : IMarshalable
 	{
 		public EncapsulatedValue[] Values {
 			get;
@@ -175,15 +177,17 @@ namespace Neovim.Msgpack
 		{
 			Values = new EncapsulatedValue[length];
 			for (int i = 0; i < Length; ++i) {
-				Values [i] = client.ReadEncapsulated();
+				Values [i] = client.ReadEncapsulated ();
 			}
 		}
 
-		public void WriteTo(Transcoder tc) {
+		public void WriteTo (Transcoder tc)
+		{
 			// TODO
 		}
 
-		public void ReadFrom(Transcoder tc) {
+		public void ReadFrom (Transcoder tc)
+		{
 			//TODO
 		}
 	}

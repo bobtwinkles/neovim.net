@@ -215,7 +215,7 @@ namespace Neovim.Msgpack
 			_transport.Write (bytes, 0, bytes.Length);
 		}
 
-		public void WriteArray (MsgPackMarshalable[] obj)
+		public void WriteArray (IMarshalable[] obj)
 		{
 			if (obj.Length < 16) {
 				_writer.Write ((byte)(0x90 | obj.Length));
@@ -231,7 +231,7 @@ namespace Neovim.Msgpack
 			}
 		}
 
-		public void WriteDictionary (Dictionary<MsgPackMarshalable, MsgPackMarshalable> dict)
+		public void WriteDictionary (Dictionary<IMarshalable, IMarshalable> dict)
 		{
 			if (dict.Count < 16) {
 				_writer.Write ((byte)(0x80 | dict.Count));
